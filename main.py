@@ -5,6 +5,7 @@ import hhparser_salary as hs
 import sys
 import time
 import json
+import requests as req
 
 # Создаем словарь для хранения окончательных результатов
 # парсинга зарплат
@@ -13,28 +14,6 @@ d_salary["Junior"] = [0, 0, 0]
 d_salary["Middle"] = [0, 0, 0]
 d_salary["Senior"] = [0, 0, 0]
 d_salary["Unknown"] = [0, 0, 0]
-
-def process_vacancies():
-    """
-        Функция обработки результатов парсинга технологий
-    :return: Словарь с отсортированными результатами
-    """
-        l_terms = o_hhrequest.process_url(s_url)
-        i_number_vacancies += 1
-        sys.stdout.write("\r")
-        sys.stdout.write(f"Завершена обработка вакансии {i_number_vacancies}")
-
-    print(f'\nВсего вакансий: {i_number_vacancies}\n')
-    d_sorted = dict(sorted(d_terms_dictionary.items(), key=lambda x: x[1], reverse=True))
-    for key, value in d_sorted.items():
-        d_sorted[key] = round((value/i_number_vacancies)*100,2)
-
-    print("10 самых популярных технологий")
-    for kye, value in list(d_sorted.items())[:10]:
-        print(f'{kye} : [{value}%]')
-    print("\n")
-
-    return d_sorted
 
 def process_salaries():
     """
@@ -93,21 +72,16 @@ def add_skills(sum_skills:dict, skills_to_add:list):
         else:
             sum_skills[s_skill] = 1
 
-def sort_skills(skills:dict) -> dict:
+def sort_skills(skills:dict, vacancies_number:int) -> dict:
     d_sorted = dict(sorted(skills.items(), key=lambda x: x[1], reverse=True))
     for key, value in d_sorted.items():
-        d_sorted[key] = round((value/i_number_vacancies)*100,2)
+        d_sorted[key] = round((value/vacancies_number)*100,2)
     return d_sorted
 
-if __name__ == '__main__':
 
-    print("Head Hunter Analysis application.")
+def main(region:str, search:str):
     # Задаем начальные значения поиска
-    d_terms_dictionary = dict()
     s_url = 'https://api.hh.ru/vacancies?area=#'
-
-    # Запрашимваем строку поиска
-    s_search = input("Введите строку поиска:")
 
     # Создаем парсеры для извлечения информации
     o_pars_description = hp.HHParserDescription()
@@ -122,19 +96,12 @@ if __name__ == '__main__':
     o_hhrequest.set_url(s_url)
 
     # Запрашиваем регион поиска у пользователя
-    while True:
-        s_region = input("Введите регион поиска:")
-        try:
-             o_hhrequest.set_region(s_region)
-             break
-        except ValueError:
-            print("Регион не найден.")
+    o_hhrequest.set_region(region)
 
     # Передаем строку поиска управляющему классу
-    o_hhrequest.set_search_pattern(s_search)
+    o_hhrequest.set_search_pattern(search)
 
     # Получаем список urls вакансий, удовлетворяющих критерию поиска
-    print("Получаем список вакансий...")
     l_urls = o_hhrequest.get_urls_vacancies()
 
     if not l_urls:
@@ -151,8 +118,14 @@ if __name__ == '__main__':
             l_salary.append(o_pars_salary.parse(j_vacancy))
             i_number_vacancies += 1
 
-        d_skills_sorted = sort_skills(d_key_skills)
-        d_skills_description = sort_skills(d_description)
+        d_skills_sorted = sort_skills(d_key_skills, i_number_vacancies)
+        d_skills_description_sorted = sort_skills(d_description, i_number_vacancies)
+
+
+
+
+if __name__ == '__main__':
+
 
         if input("Сохранить результаты поиска Y/N?") == "Y":
             file_name = "".join(s_search)+"-"+time.strftime("%Y%m%d%H%M", time.localtime())

@@ -31,8 +31,13 @@ class HHParserDescription():
         """
         re_cleanr = re.compile('^[A-Za-z0-9]+')
         self._s_description = re_cleanr.sub(" ", self._s_description )
-        self._s_description = self._s_description.replace(",","")
-        self._s_description = self._s_description.replace(";","")
+        self._s_description = self._s_description.replace(",", "")
+        self._s_description = self._s_description.replace(";", "")
+        self._s_description = self._s_description.replace(")", "")
+        self._s_description = self._s_description.replace("(", "")
+        self._s_description = self._s_description.replace("«", "")
+        self._s_description = self._s_description.replace("»", "")
+        self._s_description = self._s_description.replace("!", "")
 
 
     def _clean_html(self) -> None:

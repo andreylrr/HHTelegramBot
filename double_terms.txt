@@ -34,3 +34,9 @@ Objective C
 Frontend Angular
 Virtual Reality
 Internet Things
+Microsoft Office
+MS Office
+MS Excel
+MS Word
+Microsoft Excel
+Microsoft Word

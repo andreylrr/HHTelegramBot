@@ -1,4 +1,5 @@
 import json
+import re
 #
 #   HHParserSalary класс предназначен для вакансий полученных с сайта hh.ru
 #   В каждой вакансии парсер определяет зарплаты, если они указаны
@@ -38,11 +39,12 @@ class HHParserSalary():
 
     def _get_vacancy_type(self, vacancy: str):
         self._l_found_salary = []
-        if "senior" in vacancy.lower():
+        vac_descr: str = vacancy.lower()
+        if re.search(r"senior|ведущий|старший", vac_descr):
             self._s_type_vacancy = "Senior"
-        elif "junior" in vacancy.lower():
+        elif re.search(r"junior|младший|ученик", vac_descr):
             self._s_type_vacancy = "Junior"
-        elif "middle" in vacancy.lower():
+        elif re.search(r"middle|опытный", vac_descr):
             self._s_type_vacancy = "Middle"
         else:
             self._s_type_vacancy = "Unknown"

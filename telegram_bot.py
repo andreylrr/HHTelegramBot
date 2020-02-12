@@ -22,7 +22,7 @@ sqlite_db: str = ""
 file_folder: str = ""
 
 
-@dp.message_handler(commands=['start'])
+@dp.message_handler(commands=['submit'])
 async def process_start_command(message: types.Message):
     '''
         Функция обработки команды /start
@@ -34,12 +34,10 @@ async def process_start_command(message: types.Message):
     # Для этого создаем запись в БД со статусом 0
     if current_telbot[user_id][0] and current_telbot[user_id][1]:
         add_request(current_telbot, message)
-        # удаляем текущий запрос из словаря
-        del current_telbot[user_id]
         # Посылаем сообщение пользователю
         await bot.send_message(message.chat.id,
                                md.text("Ваш запрос направлен на обработку.\nИспользуйте команду ",
-                               md.bold("/list all")," для проверки состояния вашего запроса."),
+                               md.bold("/list")," для проверки состояния вашего запроса."),
                                reply_markup = markup,
                                parse_mode = ParseMode.MARKDOWN)
     else:
@@ -47,7 +45,7 @@ async def process_start_command(message: types.Message):
         await message.reply("Ваш запрос сформирован не полностью. Должет быть указан регион и текст запроса.")
 
 
-@dp.message_handler(commands=['help'])
+@dp.message_handler(commands=['help','start'])
 async def process_help_command(message: types.Message):
     '''
         Функция обработки команды /help
@@ -58,13 +56,14 @@ async def process_help_command(message: types.Message):
     await bot.send_message(
             message.chat.id,
             md.text(
-                md.text("Cписок достурых команд:"),
+                md.text("Cписок доступных команд:"),
                 md.text(md.bold("\n/help"), " - вывод справочной информации"),
-                md.text(md.bold("\n/start"), "- начать обработки запроса"),
-                md.text(md.bold("\n/region"), "- с параметром установить регион, без параметров вывести текущий регион"),
-                md.text(md.bold("\n/request"), "- с параметром определить запрос, без параметров вывести текущий запрос"),
-                md.text(md.bold("\n/list"), "- вывести список запросов"),
-                md.text(md.bold("\n/display"), "- вывести результаты конкрентого запроса")
+                md.text(md.bold("\n/start"), " - вывод справочной информации"),
+                md.text(md.bold("\n/submit"), "- начать обработку запроса"),
+                md.text(md.bold("\n/region"), "- с параметром - установить регион, без параметров - вывести текущий регион"),
+                md.text(md.bold("\n/request"), "- с параметром - определить запрос, без параметров - вывести текущий запрос"),
+                md.text(md.bold("\n/list"), "- вывести список всех запросов"),
+                md.text(md.bold("\n/display"), "- с параметром - вывести результаты конкрентого запроса, без параметров - текущего запроса")
 
             ),
             reply_markup=markup,
@@ -139,17 +138,16 @@ async def process_start_command(message: types.Message):
 @dp.message_handler(commands=['list'])
 async def process_start_command(message: types.Message):
     '''
-        Функция обработки команды /list {param}
+        Функция обработки команды /list
     :param message:
-    :return:
     '''
     params: str = message.get_args()
     # Если указан параметр, то выбираем все запросы из БД для этого пользователя
     markup = types.ReplyKeyboardRemove()
-    if params.lower().startswith("all"):
-        # Читаем все запросы из БД
-        get_all_requests(message)
-        request_number: int = 1
+    # Читаем все запросы из БД
+    get_all_requests(message)
+    request_number: int = 1
+    if telbot.get(message.from_user.id):
         await bot.send_message(message.chat.id, md.text('Список всех запросов:'))
         # Анализируем статус запроса
         for request in telbot[message.from_user.id]:
@@ -177,20 +175,7 @@ async def process_start_command(message: types.Message):
                   )
             request_number += 1
     else:
-        # Если у команды не было задано параметров, то выводим текущий запрос
-        if current_telbot.get(message.from_user.id):
-            region = str(current_telbot[message.from_user.id][0]).replace("None", "Не задан")
-            request = str(current_telbot[message.from_user.id][1]).replace("None","Не задан")
-            await bot.send_message(message.chat.id,
-                                   md.text("Текущий запрос:\nрегион: ", md.bold(region)),
-                                   md.text("\nзапрос: ", md.bold(request)),
-                                   reply_markup=markup,
-                                   parse_mode=ParseMode.MARKDOWN,
-                                   )
-            await message.reply(f"Текущий запрос: \nрегион: {region} \nзапрос: {request}")
-        else:
-            await message.reply("Текущий запрос не сформирован.")
-
+        await bot.send_message(message.chat.id, md.text('Запросов не найдено'))
 
 @dp.message_handler(commands=['display'])
 async def display_result(message: types.message):
@@ -201,58 +186,73 @@ async def display_result(message: types.message):
     arg: str = message.get_args()
     markup=types.ReplyKeyboardRemove()
     # Если параметр быд задан, и он является числом
-    if arg.isnumeric():
-        if telbot.get(message.from_user.id):
-            if len(telbot.get(message.from_user.id)) >= int(arg) > 0:
-                row = telbot[message.from_user.id][int(arg)-1]
-                if row:
-                    # Были ли найдены вакансии по этому запросу
-                    if row[2]:
-                        # Если запрос найден, то открываем файл с результатами
-                        with open(file_folder + "/" + row[5], 'r') as f:
-                            result: json = json.load(f)
-                        # Формируем строки вывода
-                        description_skills: dict = result['description']
-                        key_skills: dict = result['keyskills']
-                        salary_average: dict = result['salary']
-                        # Для навыков из описания
-                        sum_description: str = ""
-                        for key, value in list(description_skills.items())[:10]:
-                            sum_description += key + " - " + str(value) + "%\n"
-                        # Для навыков из ключевых навыков
-                        sum_keyskills: str = ""
-                        for key, value in list(key_skills.items())[:10]:
-                            sum_keyskills += key + " - " + str(value) + "%\n"
-                        sum_salaries: str = ""
-                        # Для зарплат
-                        for key, value in salary_average.items():
-                            sum_salaries += key + "   от: " + '{:6.0f}'.format(value[0]) + "₽.  до: " + '{:6.0f}'.format(value[1]) + "₽.\n"
+    if arg:
+        if arg.isnumeric():
+            if telbot.get(message.from_user.id):
+                if len(telbot.get(message.from_user.id)) >= int(arg) > 0:
+                    row = telbot[message.from_user.id][int(arg)-1]
+                    if row:
+                        # Были ли найдены вакансии по этому запросу
+                        if row[2]:
+                            # Если запрос найден, то открываем файл с результатами
+                            with open(file_folder + "/" + row[5], 'r') as f:
+                                result: json = json.load(f)
+                            # Формируем строки вывода
+                            description_skills: dict = result['description']
+                            key_skills: dict = result['keyskills']
+                            salary_average: dict = result['salary']
+                            # Для навыков из описания
+                            sum_description: str = ""
+                            for key, value in list(description_skills.items())[:10]:
+                                sum_description += key + " - " + str(value) + "%\n"
+                            # Для навыков из ключевых навыков
+                            sum_keyskills: str = ""
+                            for key, value in list(key_skills.items())[:10]:
+                                sum_keyskills += key + " - " + str(value) + "%\n"
+                            sum_salaries: str = ""
+                            # Для зарплат
+                            for key, value in salary_average.items():
+                                sum_salaries += key + "   от: " + '{:6.0f}'.format(value[0]) + "₽.  до: " + '{:6.0f}'.format(value[1]) + "₽.\n"
 
-                        # Выводим полученные результаты
-                        sum_description = "10 навыков взятых из описания вакансии:\n\n" + sum_description
-                        sum_keyskills = "10 знаний взятых из ключевых навыков:\n\n" + sum_keyskills
-                        sum_salaries = "Усредненная зарплата для данной выборки:\n\n" + sum_salaries
-                        await bot.send_message(message.chat.id, sum_description)
-                        await bot.send_message(message.chat.id, sum_keyskills)
-                        await bot.send_message(message.chat.id, sum_salaries)
-                    else:
-                        await bot.send_message(message.chat.id,
-                                               md.text("По этому запросу не найдено ни одной вакансии."))
+                            # Выводим полученные результаты
+                            sum_description = "10 навыков взятых из описания вакансии:\n\n" + sum_description
+                            sum_keyskills = "10 знаний взятых из ключевых навыков:\n\n" + sum_keyskills
+                            sum_salaries = "Усредненная зарплата для данной выборки:\n\n" + sum_salaries
+                            await bot.send_message(message.chat.id, sum_description)
+                            await bot.send_message(message.chat.id, sum_keyskills)
+                            await bot.send_message(message.chat.id, sum_salaries)
+                        else:
+                            await bot.send_message(message.chat.id,
+                                                   md.text("По этому запросу не найдено ни одной вакансии."))
+                else:
+                    # Если номер запроса указан неверно
+                    await message.reply(f"Неверный параметр: {arg}")
             else:
-                # Если номер запроса указан неверно
-                await message.reply(f"Неверный параметр: {arg}")
+                # Возможны случаи ( telegram bot ) был перезапущен, и запросы из
+                # кэша пропали. Тогда нужно запустить команду /list all и кэш будет восстановлен
+                await bot.send_message(message.chat.id,
+                                       md.text("Необходимо обновить данные с помощью команды", md.bold("/list all")),
+                                       reply_markup=markup,
+                                       parse_mode=ParseMode.MARKDOWN,
+                                       )
         else:
-            # Возможны случаи ( telegram bot ) был перезапущен, и запросы из
-            # кэша пропали. Тогда нужно запустить команду /list all и кэш будет восстановлен
+            # Если параметр не является числом, то выводим сообщение об ошибке
+            await message.reply("Неправильный формат команды.")
+    else:
+        # Если у команды не было задано параметров, то выводим текущий запрос
+        if current_telbot.get(message.from_user.id):
+            region = str(current_telbot[message.from_user.id][0]).replace("None", "Не задан")
+            request = str(current_telbot[message.from_user.id][1]).replace("None","Не задан")
             await bot.send_message(message.chat.id,
-                                   md.text("Необходимо обновить данные с помощью команды", md.bold("/list all")),
+                                   md.text(
+                                        md.text("Текущий запрос:\nрегион: ", md.bold(region)),
+                                        md.text("\nзапрос: ", md.bold(request))
+                                   ),
                                    reply_markup=markup,
                                    parse_mode=ParseMode.MARKDOWN,
                                    )
-    else:
-        # Если параметр не является числом, то выводим сообщение об ошибке
-        await message.reply("Неправильный формат команды.")
-
+        else:
+            await message.reply("Текущий запрос не сформирован.")
 
 @dp.message_handler()
 async def wrong_command(message: types.Message):

@@ -45,7 +45,7 @@ async def process_start_command(message: types.Message):
         await message.reply("Ваш запрос сформирован не полностью. Должет быть указан регион и текст запроса.")
 
 
-@dp.message_handler(commands=['help','start'])
+@dp.message_handler(commands=['help',""])
 async def process_help_command(message: types.Message):
     '''
         Функция обработки команды /help
@@ -253,6 +253,25 @@ async def display_result(message: types.message):
                                    )
         else:
             await message.reply("Текущий запрос не сформирован.")
+
+
+@dp.message_handler(commands=["start"])
+async def wrong_command(message: types.Message):
+    '''
+       Функция приветствия пользователя
+    :param message: Сообщение от пользователя
+    '''
+    markup = types.ReplyKeyboardRemove()
+    await bot.send_message(message.from_user.id, md.text(
+                                                           md.text("Здравствуйте ", md.bold(message.from_user.first_name), "!"),
+                                                           md.text("Мы рады, что Вы зашли на наш огонек."),
+                                                           md.text("Здесь Вы можете узнать какие навыки наиболее востребованы для разных профессий, а также узнать размер средней заработной платы для них."),
+                                                           md.text("Используйте команду /help для получения списка доступных команд с их кратким содержанием."),
+                                                           md.text("Успехов!")
+                                                         ),
+                           reply_markup = markup,
+                           parse_mode = ParseMode.MARKDOWN,)
+
 
 @dp.message_handler()
 async def wrong_command(message: types.Message):
